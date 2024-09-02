@@ -20,7 +20,15 @@ public struct PythonGrammar: Grammar {
         var tokenType: TokenType { return .comment }
 
         func matches(_ segment: Segment) -> Bool {
-            return segment.tokens.current.hasPrefix("#")
+            if segment.tokens.current.hasPrefix("#") {
+                return true
+            }
+
+            if segment.tokens.onSameLine.contains(anyOf: "#", "\"\"\"") {
+                return true
+            }
+            
+            return false
         }
     }
 
