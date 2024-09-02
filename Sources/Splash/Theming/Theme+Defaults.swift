@@ -161,11 +161,11 @@ public extension Theme {
             tokenColors: [
                 .keyword: Color(red: 0.706, green: 0.0, blue: 0.384),
                 .string: Color(red: 0.729, green: 0.0, blue: 0.067),
-                .type: Color(red: 0.267, green: 0.537, blue: 0.576),
-                .call: Color(red: 0.267, green: 0.537, blue: 0.576),
+                .type: Color(red: 77/255.0, green: 0.0, blue: 158/255.0),
+                .call: Color(red: 46/255.0, green: 13/255.0, blue: 110/255.0),
                 .number: Color(red: 0.0, green: 0.043, blue: 1.0),
                 .comment: Color(red: 0.336, green: 0.376, blue: 0.42),
-                .property: Color(red: 0.267, green: 0.537, blue: 0.576),
+                .property: Color(red: 92/255.0, green: 38/255.0, blue: 153/255.0),
                 .dotAccess: Color(red: 0.267, green: 0.537, blue: 0.576),
                 .preprocessing: Color(red: 0.431, green: 0.125, blue: 0.051)
             ],
