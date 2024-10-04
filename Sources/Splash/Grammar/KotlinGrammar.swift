@@ -12,11 +12,19 @@ public struct KotlinGrammar: Grammar {
     public var syntaxRules: [SyntaxRule]
 
     public init() {
-        delimiters = .whitespacesAndNewlines
+        var delimiters = CharacterSet.alphanumerics.inverted
+        delimiters.remove("_")
+        delimiters.remove("\"")
+        delimiters.remove("#")
+        delimiters.remove("@")
+        delimiters.remove("$")
+        self.delimiters = delimiters
 
         syntaxRules = [
             CommentRule(),
-            StringRule(),
+            RawStringRule(),
+            MultiLineStringRule(),
+            SingleLineStringRule(),
             NumberRule(),
             KeywordRule(),
             OperatorRule()
@@ -27,17 +35,73 @@ public struct KotlinGrammar: Grammar {
         var tokenType: TokenType { return .comment }
 
         func matches(_ segment: Segment) -> Bool {
-            let currentToken = segment.tokens.current
-            return currentToken.hasPrefix("//") || currentToken.hasPrefix("/*")
+            if segment.tokens.current.hasPrefix("/*") {
+                if segment.tokens.current.hasSuffix("*/") {
+                    return true
+                }
+            }
+            
+            if segment.tokens.current.hasPrefix("//") {
+                return true
+            }
+
+            if segment.tokens.onSameLine.contains(anyOf: "//", "///") {
+                return true
+            }
+
+            if segment.tokens.current.isAny(of: "/*", "/**", "*/") {
+                return true
+            }
+
+            let multiLineStartCount = segment.tokens.count(of: "/*") + segment.tokens.count(of: "/**")
+            return multiLineStartCount != segment.tokens.count(of: "*/")
         }
     }
 
-    struct StringRule: SyntaxRule {
+    struct RawStringRule: SyntaxRule {
         var tokenType: TokenType { return .string }
 
         func matches(_ segment: Segment) -> Bool {
-            let currentToken = segment.tokens.current
-            return currentToken.hasPrefix("\"") || currentToken.hasPrefix("\"\"\"")
+            guard !segment.isWithinRawStringInterpolation else {
+                return false
+            }
+
+            if segment.isWithinStringLiteral(withStart: "#\"", end: "\"#") {
+                return true
+            }
+
+            let multiLineStartCount = segment.tokens.count(of: "#\"\"\"")
+            let multiLineEndCount = segment.tokens.count(of: "\"\"\"#")
+            return multiLineStartCount != multiLineEndCount
+        }
+    }
+
+    struct MultiLineStringRule: SyntaxRule {
+        var tokenType: TokenType { return .string }
+
+        func matches(_ segment: Segment) -> Bool {
+            guard !segment.tokens.count(of: "\"\"\"").isEven else {
+                return false
+            }
+
+            return !segment.isWithinStringInterpolation
+        }
+    }
+    
+    struct SingleLineStringRule: SyntaxRule {
+        var tokenType: TokenType { return .string }
+
+        func matches(_ segment: Segment) -> Bool {
+            if segment.tokens.current.hasPrefix("\"") &&
+               segment.tokens.current.hasSuffix("\"") {
+                return true
+            }
+
+            guard segment.isWithinStringLiteral(withStart: "\"", end: "\"") else {
+                return false
+            }
+
+            return !segment.isWithinStringInterpolation && !segment.isWithinRawStringInterpolation
         }
     }
 
@@ -88,5 +152,59 @@ public struct KotlinGrammar: Grammar {
             let currentToken = segment.tokens.current
             return OperatorRule.operators.contains(currentToken)
         }
+    }
+}
+
+private extension Segment {
+    func isWithinStringLiteral(withStart start: String, end: String) -> Bool {
+        if tokens.current.hasPrefix(start) {
+            return true
+        }
+        
+        if tokens.current.hasSuffix(end) {
+            return true
+        }
+        
+        var markerCounts = (start: 0, end: 0)
+        var previousToken: String?
+        
+        for token in tokens.onSameLine {
+            if token.hasPrefix("(") || token.hasPrefix("#(") || token.hasPrefix("\"") {
+                guard previousToken != "\\" else {
+                    previousToken = token
+                    continue
+                }
+            }
+            
+            if token == start {
+                if start != end || markerCounts.start == markerCounts.end {
+                    markerCounts.start += 1
+                } else {
+                    markerCounts.end += 1
+                }
+            } else if token == end && start != end {
+                markerCounts.end += 1
+            } else {
+                if token.hasPrefix(start) {
+                    markerCounts.start += 1
+                }
+                
+                if token.hasSuffix(end) {
+                    markerCounts.end += 1
+                }
+            }
+            
+            previousToken = token
+        }
+        
+        return markerCounts.start != markerCounts.end
+    }
+    
+    var isWithinStringInterpolation: Bool {
+        return false
+    }
+    
+    var isWithinRawStringInterpolation: Bool {
+        return false
     }
 }
